@@ -496,8 +496,9 @@ int update_variables(int force)
          flags |= UPDATE_MACHINE;
       }
 
+      bool is_pal = machine->id != LIBSPECTRUM_MACHINE_48_NTSC && machine->id != LIBSPECTRUM_MACHINE_TS2068;
       unsigned width = machine->is_timex ? 640 : 320;
-      unsigned height = machine->is_timex ? 480 : 240;
+      unsigned height = is_pal ? (machine->is_timex ? 576 : 288) : (machine->is_timex ? 480 : 240);
 
       if (width != hard_width || height != hard_height || force)
       {
@@ -1080,22 +1081,22 @@ static void render_video(void)
          if (machine->is_timex)
          {
             const uint16_t* src1 = keyboard_overlay;
-            const uint16_t* src2 = image_buffer;
-            uint16_t* dest = image_buffer_2;
+            const uint16_t* src2 = image_buffer + (24 * hard_width); // Offset by 24px
+            uint16_t* dest = image_buffer_2 + (24 * hard_width);    // Offset by 24px
             int x, y;
 
             if (keyb_transparent)
             {
-               for (y = 0; y < 240; y++)
+               for (y = 0; y < 240; y++) // Process only 240px height
                {
                   for (x = 0; x < 320; x++)
                   {
                      uint32_t src1_pixel = (*src1++ & 0xe79c) * 3;
 
-                     dest[ 0 ] = (src1_pixel + ( src2[ 0 ] & 0xe79c)) >> 2;
-                     dest[ 1 ] = (src1_pixel + ( src2[ 1 ] & 0xe79c)) >> 2;
-                     dest[ 640 ] = (src1_pixel + ( src2[ 640 ] & 0xe79c)) >> 2;
-                     dest[ 641 ] = (src1_pixel + ( src2[ 641 ] & 0xe79c)) >> 2;
+                     dest[0] = (src1_pixel + (src2[0] & 0xe79c)) >> 2;
+                     dest[1] = (src1_pixel + (src2[1] & 0xe79c)) >> 2;
+                     dest[640] = (src1_pixel + (src2[640] & 0xe79c)) >> 2;
+                     dest[641] = (src1_pixel + (src2[641] & 0xe79c)) >> 2;
 
                      src2 += 2;
                      dest += 2;
@@ -1107,16 +1108,16 @@ static void render_video(void)
             }
             else
             {
-               for (y = 0; y < 240; y++)
+               for (y = 0; y < 240; y++) // Process only 240px height
                {
                   for (x = 0; x < 320; x++)
                   {
                      uint32_t src1_pixel = *src1++;
 
-                     dest[ 0 ] = src1_pixel;
-                     dest[ 1 ] = src1_pixel;
-                     dest[ 640 ] = src1_pixel;
-                     dest[ 641 ] = src1_pixel;
+                     dest[0] = src1_pixel;
+                     dest[1] = src1_pixel;
+                     dest[640] = src1_pixel;
+                     dest[641] = src1_pixel;
 
                      src2 += 2;
                      dest += 2;
@@ -1125,34 +1126,34 @@ static void render_video(void)
                   src2 += 640;
                   dest += 640;
                }
-             }
+            }
          }
          else
          {
             if (keyb_transparent)
             {
                const uint16_t* src1 = keyboard_overlay;
-               const uint16_t* src2 = image_buffer;
-               const uint16_t* end = src1 + sizeof(keyboard_overlay) / sizeof(keyboard_overlay[0]);
-               uint16_t* dest = image_buffer_2;
+               const uint16_t* src2 = image_buffer + (24 * hard_width); // Offset by 24px
+               const uint16_t* end = src1 + (240 * 320);                // Limit to 240px height
+               uint16_t* dest = image_buffer_2 + (24 * hard_width);    // Offset by 24px
 
-               do
+               while (src1 < end)
                {
                   uint32_t src1_pixel = *src1++ & 0xe79c;
                   uint32_t src2_pixel = *src2++ & 0xe79c;
 
                   *dest++ = (src1_pixel * 3 + src2_pixel) >> 2;
                }
-               while (src1 < end);
             }
             else
             {
-               memcpy(image_buffer_2, keyboard_overlay, sizeof(keyboard_overlay));
+               memcpy(image_buffer_2 + (24 * hard_width), keyboard_overlay, 240 * 320 * sizeof(uint16_t)); // Copy to offset position
             }
          }
 
+         // Render virtual keyboard highlighting
          unsigned x = keyb_positions[keyb_y].x + keyb_x * 24;
-         unsigned y = keyb_positions[keyb_y].y;
+         unsigned y = keyb_positions[keyb_y].y + 24; // Offset highlighting by 24px
          unsigned width = 23;
 
          if (keyb_y == 3)
@@ -1169,7 +1170,7 @@ static void render_video(void)
          }
 
          unsigned mult = machine->is_timex ? 2 : 1;
-         uint16_t* pixel = image_buffer_2 + (y * hard_width + x + 1) * mult;
+         uint16_t* pixel = image_buffer_2 + ((y * hard_width) + x + 1) * mult;
          unsigned i, j;
 
          for (j = mult; j > 0; --j )
