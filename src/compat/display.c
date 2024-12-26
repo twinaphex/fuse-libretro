@@ -14,10 +14,10 @@ int uidisplay_init(int width, int height)
       width = 320;
    }
    
-   if (height != 240)
+   if (height != 240 && height != 288)
    {
       log_cb(RETRO_LOG_ERROR, "Invalid value for the display height: %d\n", height);
-      height = 240;
+      height = 288;
    }
    
    //soft_width = (unsigned)width;
